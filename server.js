@@ -197,7 +197,12 @@ export function createApp({
   const qDelete = db.prepare('DELETE FROM bag_items WHERE session_id = ? AND variant_id = ?');
 
   const indexHtmlPath = path.join(publicDir, 'index.html');
+  const publicRoot = path.resolve(publicDir);
   const catalogJson = JSON.stringify(CATALOG);
+  const MIME_TYPES = {
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8'
+  };
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -259,7 +264,7 @@ export function createApp({
           }
           db.exec('COMMIT');
         } catch (err) {
-          try { db.exec('ROLLBACK'); } catch {}
+          try { db.exec('ROLLBACK'); } catch { }
           throw err;
         }
 
@@ -308,6 +313,21 @@ export function createApp({
         return res.end(html);
       }
 
+      if (req.method === 'GET' && (pathname.startsWith('/css/') || pathname.startsWith('/js/'))) {
+        const ext = path.extname(pathname);
+        const mime = MIME_TYPES[ext];
+        if (mime) {
+          const target = path.resolve(publicRoot, '.' + pathname);
+          if (target.startsWith(publicRoot + path.sep) && fs.existsSync(target) && fs.statSync(target).isFile()) {
+            res.writeHead(200, {
+              'Content-Type': mime,
+              'X-Content-Type-Options': 'nosniff'
+            });
+            return res.end(fs.readFileSync(target));
+          }
+        }
+      }
+
       if (pathname.startsWith('/api/')) {
         return sendJson(res, 404, { error: 'Not found' });
       }
@@ -325,7 +345,7 @@ export function createApp({
     close() {
       return new Promise((resolve) => {
         server.close(() => {
-          try { db.close(); } catch {}
+          try { db.close(); } catch { }
           resolve();
         });
       });

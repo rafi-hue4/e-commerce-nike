@@ -44,7 +44,23 @@ describe('Runway Full-Stack API & Server', () => {
 
     const html = await res.text();
     assert.match(html, /<runway-section\b/);
-    assert.match(html, /customElements\.define\('runway-section'/);
+    assert.match(html, /\/css\/runway\.css/);
+    assert.match(html, /\/css\/archive\.css/);
+    assert.match(html, /\/js\/app\.js/);
+  });
+
+  it('serves split static CSS/JS modules and blocks path traversal', async () => {
+    const cssRes = await fetch(`${baseUrl}/css/archive.css`);
+    assert.equal(cssRes.status, 200);
+    assert.match(cssRes.headers.get('content-type') || '', /text\/css/);
+
+    const jsRes = await fetch(`${baseUrl}/js/runway-section.js`);
+    assert.equal(jsRes.status, 200);
+    assert.match(jsRes.headers.get('content-type') || '', /application\/javascript/);
+    assert.match(await jsRes.text(), /customElements\.define\('runway-section'/);
+
+    const traversalRes = await fetch(`${baseUrl}/js/../server.js`);
+    assert.equal(traversalRes.status, 404);
   });
 
   it('GET /api/catalog returns 6 looks and 8 items', async () => {
